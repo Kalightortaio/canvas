@@ -9,6 +9,17 @@
         <link rel="stylesheet" type="text/css" href="assets/css/index.css">
     </head>
     <body>
+        <div id="right-toolbar">
+            <div id="draw-container">
+                <div id="draw-btn">
+                    <img id="draw-img-hand" style="display: block;" src="/resources/ui/hand.png" alt="button to toggle draw mode">
+                    <img id="draw-img-brush" style="display: none;" src="/resources/ui/brush.png" alt="button to toggle hand mode">
+                </div>
+                <div id="picker-container">
+                    <div id="color-picker" style="visibility: hidden;"></div>
+                </div>
+            </div>
+        </div>
         <div id="canvas-container">
             <canvas id="board"></canvas>
             <div id="zoom">
@@ -17,6 +28,7 @@
                 </div>
             </div>
         </div>
+        <div id="brush-cursor"></div>
         <script src="https://code.jquery.com/jquery-3.6.0.js" integrity="sha256-H+K7U5CnXl1h5ywQfKtSj8PCmoN9aaq30gDh27Xc0jk="crossorigin="anonymous"></script>
         <script type="text/javascript" src="assets/js/server.js" defer></script>
     </body>
