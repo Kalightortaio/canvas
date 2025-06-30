@@ -47,14 +47,15 @@ html, body {
 #draw-container {
     display: flex;
     height: 100%;
-    max-width: fit-content;
     flex-direction: column;
     align-items: center;
     justify-content: space-around;
     padding: 32px;
+    gap: 32px;
 }
 
 #picker-container {
+    width: 100%;
     height: 100%;
     display: flex;
     justify-content: space-around;
@@ -108,4 +109,64 @@ html, body {
     box-sizing: border-box;
     z-index: 1;
     display: none;
+}
+
+#loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 3;
+    background-color: white;
+    display: flex;
+    height: 100%;
+    width: 100%;
+    justify-content: center;
+    align-items: center;
+    pointer-events: none;
+}
+
+#loading img {
+    height: max(15dvw, 15dvh);
+    max-height: 400px;
+}
+
+#error {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 4;
+    background-color: #b00;
+    display: flex;
+    height: 100%;
+    width: 100%;
+    justify-content: center;
+    align-items: center;
+    pointer-events: none;
+    display: none;
+    padding: 24px;
+}
+
+#error img {
+    width: max(50dvw, 50dvh);
+    min-width: 180px;
+    filter: grayscale(0) invert(1);
+    float: left;
+    margin-right: 24px;
+    margin-bottom: 24px;
+}
+
+#error p {
+    font-family: 'Courier New', Courier, monospace;
+    color: white;
+    font-size: max(4dvw, 4dvh);
+    font-weight: bold;
+}
+
+@media(max-height: 810px) {
+    #draw-container { flex-direction: row-reverse; height: auto; width: 100% }
+    #color-picker { width: fit-content; display: flex }
+}
+
+@media(pointer: none), (pointer: coarse), (max-width: 810px) and (max-height: 810px) {
+    #error { display: block; }
 }

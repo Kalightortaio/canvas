@@ -11,6 +11,7 @@ const picker = document.getElementById('color-picker');
 const drawBtn = document.getElementById('draw-btn');
 const drawImgHand = document.getElementById('draw-img-hand');
 const drawImgBrush = document.getElementById('draw-img-brush');
+const loadingScreen = document.getElementById('loading');
 
 const BOARD_SIZE = 1000;
 const MIN_SCALE = 1, MID_SCALE = 40, MAX_SCALE = 80;
@@ -259,6 +260,19 @@ function imageSmoothing(ctx) {
     ctx.imageSmoothingEnabled = false;
 }
 
+function fade(element) {
+    var op = 1;
+    var timer = setInterval(function () {
+        if (op <= 0.05) {
+            clearInterval(timer);
+            element.style.display = 'none';
+        }
+        element.style.opacity = op;
+        element.style.filter = 'alpha(opacity=' + op * 100 + ")";
+        op -= op * 0.05;
+    }, 50);
+}
+
 view.addEventListener("mousedown", e => {
     dragging = true;
     if (mode === "pan") {
@@ -312,6 +326,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     centreViewport();
     applyZoom(); applyPan();
     initColorPicker();
+    fade(loadingScreen);
 });
 
 /* Retired functions
