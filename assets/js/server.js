@@ -273,7 +273,9 @@ function fade(element) {
     }, 50);
 }
 
-view.addEventListener("mousedown", e => {
+view.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    view.setPointerCapture(e.pointerId);
     dragging = true;
     if (mode === "pan") {
         view.style.cursor = "grabbing";
@@ -282,15 +284,15 @@ view.addEventListener("mousedown", e => {
     } else {
         paintPixel(e);
     }
-});
+}, { passive: false });
 
-window.addEventListener("mousemove", e => {
-    if (mode === "pan" && dragging) {
+window.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    if (mode === "pan") {
         panX = startPanX + (startX - e.clientX) / scale;
         panY = startPanY + (startY - e.clientY) / scale;
         applyPan();
-    }
-    if (mode === "draw") {
+    } else if (mode === "draw") {
         const size = Number(brush.dataset.size) || 1;
         brush.style.left = `${e.clientX - size / 2}px`;
         brush.style.top = `${e.clientY - size / 2}px`;
@@ -298,13 +300,14 @@ window.addEventListener("mousemove", e => {
             paintPixel(e);
         }
     }
-});
+}, { passive: false });
 
-window.addEventListener("mouseup", () => {
+window.addEventListener("pointerup", e => {
+    view.releasePointerCapture(e.pointerId);
     dragging = false;
     if (mode === "pan") view.style.cursor = "grab";
     if (mode === "draw") uploadData();
-});
+}, { passive: false });
 
 drawBtn.addEventListener('click', () => {
     const enteringDraw = mode === "pan";
