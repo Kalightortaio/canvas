@@ -24,14 +24,13 @@ const brush = document.getElementById('brush-cursor');
 const loadingScreen = document.getElementById('loading');
 
 const BOARD_SIZE = 1000;
-const MIN_SCALE = 1, MIN_DRAW = 11, MAX_SCALE = 81, ZOOM_STEP = 10;
+const MIN_SCALE = 1, MIN_DRAW = 21, MAX_SCALE = 81, ZOOM_STEP = 10;
 const PENDING = new Map();
 const OLD_STATE = new Map();
 const MAX_BATCH = 256;
 
 let mode = "pan";
 let dataRows = [];
-let rotated = false;
 let batchProgress = 0;
 let progPercent = 0;
 let scale = 21, panX = 0, panY = 0;
@@ -207,13 +206,7 @@ function paintPixel(evt) {
 function updateProgress() {
     batchProgress = PENDING.size;
     progPercent = batchProgress / MAX_BATCH * 100;
-    if (rotated) {
-        progBar.style.height = `${progPercent}%`;
-        progBar.style.width = '100%';
-    } else {
-        progBar.style.width = `${progPercent}%`;
-        progBar.style.height = '';
-    }
+    document.documentElement.style.setProperty('--prog-percent', `${progPercent}%`);
 }
 
 function initColorPicker() {
@@ -285,13 +278,17 @@ function zoomTo(targetScale) {
 
 function zoomGuard() {
     if (mode === 'draw' && scale < MIN_DRAW) {
-        mode = 'pan';
-        view.style.cursor = 'grab';
-        picker.style.visibility = 'hidden';
-        drawImgHand.style.display = 'none';
-        drawImgBrush.style.display = 'block';
-        updateBrushAppearance();
+        exitDrawMode();
     }
+}
+
+function exitDrawMode() {
+    mode = 'pan';
+    view.style.cursor = 'grab';
+    picker.style.visibility = 'hidden';
+    drawImgHand.style.display = 'none';
+    drawImgBrush.style.display = 'block';
+    updateBrushAppearance();
 }
 
 function imageSmoothing(ctx) {
@@ -368,40 +365,12 @@ zoomOut.addEventListener('click', () => {
 });
 
 rotateBtn.addEventListener('click', () => {
-    rotated = !rotated;
-    if (rotated) {
-        uiCtnr.style.flexDirection = 'column';
-        uiCtnr.style.alignItems = 'flex-end';
-        batchCtnr.style.flexDirection = 'column-reverse';
-        batchCtnr.style.width = 'fit-content';
-        drawCtnr.style.flexDirection = 'row-reverse';
-        batchCtnr.style.padding = '0px 32px 32px 32px';
-        progCtnr.style.minWidth = '64px';
-        progCtnr.style.minHeight = 'max(calc(100dvh - 416px - 32px), 64px)';
-        progBar.style.width = '100%';
-        progBar.style.height = `${progPercent}%`;
-        progBar.style.minHeight = '0';
-        drawCtnr.style.height = 'auto';
-        drawCtnr.style.width = '100%';
-        picker.style.justifyContent = 'flex-end';
-        picker.style.minWidth = '244px';
-        picker.style.height = '64px';
-    } else {
-        uiCtnr.style.flexDirection = '';
-        uiCtnr.style.alignItems = '';
-        batchCtnr.style.flexDirection = '';
-        drawCtnr.style.flexDirection = '';
-        batchCtnr.style.padding = '';
-        batchCtnr.style.width = '';
-        progCtnr.style.minWidth = '';
-        progCtnr.style.minHeight = '';
-        progBar.style.width = `${progPercent}%`;
-        progBar.style.minHeight = '';
-        drawCtnr.style.height = '';
-        drawCtnr.style.width = '';
-        picker.style.minWidth = '';
-        picker.style.height = '';
-    }
+    uiCtnr.classList.toggle('u-c-toggled');
+    drawCtnr.classList.toggle('d-c-toggled');
+    batchCtnr.classList.toggle('b-c-toggled');
+    progCtnr.classList.toggle('p-c-toggled');
+    progBar.classList.toggle('p-b-toggled');
+    picker.classList.toggle('c-p-toggled');
 });
 
 clearBtn.addEventListener('click', () => {
@@ -422,6 +391,11 @@ submitBtn.addEventListener('click', () => {
     uploadData();
 })
 
+window.addEventListener("resize", () => {
+    const tooSmall = Math.min(window.innerWidth, window.innerHeight) < 250;
+    if (mode === 'draw' && tooSmall) exitDrawMode();
+}, { passive: true });
+
 document.addEventListener("DOMContentLoaded", async () => {
     imageSmoothing(boardCtx);
     imageSmoothing(viewCtx);
@@ -432,62 +406,3 @@ document.addEventListener("DOMContentLoaded", async () => {
     initColorPicker();
     fade(loadingScreen);
 });
-
-/* Retired functions
-const SHEET_HTML_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRnt7kqPpOJP81IAW14QSKX7LlFPP_AN8H-eXwzhPz0YaA7yDKAatdyGN50kcNB9d96QLup8ar8cm9t/pubhtml?gid=0&single=true&widget=false&chrome=false"
-
-async function loadData() {
-    const html = await fetch(SHEET_HTML_URL).then(r => r.text());
-    const temp = document.createElement("div");
-    temp.innerHTML = html;
-    const rows = temp.querySelectorAll("table.waffle tbody tr");
-    dataRows = Array.from(rows).map(row => {
-        const cells = row.querySelectorAll("td");
-        return Array.from(cells).map(cell => cell.textContent.trim());
-    })
-}
-
-function boardToRLE() {
-    const rleRows = [];
-    for (let cellY = 0; cellY < 10; cellY++) {
-        const row = [];
-        for (let cellX = 0; cellX < 10; cellX++) {
-            let out = '';
-            let prevRLE = null, rep = 0;
-            for (let y = 0; y < 100; y++) {
-                const codes = [];
-                for (let x = 0; x < 100; x++) {
-                    const { data: [r, g, b] } = boardCtx.getImageData(cellX * 100 + x,
-                        cellY * 100 + y, 1, 1);
-                    const hex = rgbToHex(r, g, b);
-                    codes.push(Object.entries(colorMap).find(([, c]) => c === hex)?.[0] ?? 'A');
-                }
-                const rle = charsToRLE(codes);
-                if (rle === prevRLE) {
-                    rep++;
-                } else {
-                    if (prevRLE !== null) out += prevRLE + (rep > 1 ? rep : '') + 'Z';
-                    prevRLE = rle;
-                    rep = 1;
-                }
-            }
-            out += prevRLE + (rep > 1 ? rep : '') + 'Z';
-            row.push(out);
-        }
-        rleRows.push(row);
-    }
-    return rleRows;
-}
-
-function charsToRLE(chars) {
-    let res = '', cur = chars[0], len = 1;
-    const flush = () => res += len < 3 ? cur.repeat(len) : len + cur;
-    for (let i = 1; i < chars.length; i++)
-        if (chars[i] === cur) len++; else { flush(); cur = chars[i]; len = 1; }
-    flush();
-    return res;
-}
-
-function rgbToHex(r, g, b) {
-    return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase();
-}*/
