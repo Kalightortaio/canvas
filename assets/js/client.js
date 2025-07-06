@@ -59,6 +59,10 @@ const colorMap = {
     P: "#000000", //Black
 };
 
+const hexToCode = Object.fromEntries(
+    Object.entries(colorMap).map(([code, hex]) => [hex, code])
+);
+
 async function loadData() {
     const resp = await fetch(SHEET_JSON_URL + "?secret_tunnel");
     dataRows = await resp.json();
@@ -177,7 +181,7 @@ function paintPixel(evt) {
     if (!OLD_STATE.has(key)) {
         const [r, g, b] = boardCtx.getImageData(tileX, tileY, 1, 1).data;
         const hex = '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase();
-        const orig = Object.entries(colorMap).find(([, c]) => c === hex)?.[0] ?? 'A';
+        const orig = hexToCode[hex] ?? 'A';
         OLD_STATE.set(key, orig);
     }
 
@@ -338,7 +342,7 @@ window.addEventListener('pointermove', e => {
 }, { passive: false });
 
 window.addEventListener("pointerup", e => {
-    view.releasePointerCapture(e.pointerId);
+    if (view.hasPointerCapture(e.pointerId)) view.releasePointerCapture(e.pointerId);
     dragging = false;
     if (mode === "pan") view.style.cursor = "grab";
 }, { passive: false });
@@ -392,8 +396,10 @@ submitBtn.addEventListener('click', () => {
 })
 
 window.addEventListener("resize", () => {
-    const tooSmall = Math.min(window.innerWidth, window.innerHeight) < 250;
-    if (mode === 'draw' && tooSmall) exitDrawMode();
+    requestAnimationFrame(() => {
+        const tooSmall = Math.min(window.innerWidth, window.innerHeight) < 250;
+        if (mode === 'draw' && tooSmall) exitDrawMode();
+    });
 }, { passive: true });
 
 document.addEventListener("DOMContentLoaded", async () => {
