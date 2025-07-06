@@ -9,23 +9,42 @@
         <link rel="stylesheet" type="text/css" href="assets/css/index.css">
     </head>
     <body>
-        <div id="right-toolbar">
+        <div id="ui-container">
             <div id="draw-container">
-                <div id="draw-btn">
-                    <img id="draw-img-hand" style="display: block;" src="/resources/ui/hand.png" alt="button to toggle draw mode">
-                    <img id="draw-img-brush" style="display: none;" src="/resources/ui/brush.png" alt="button to toggle hand mode">
+                <div id="zoom-btn">
+                    <div id="zoom-in">
+                        <img src="/resources/ui/zoom-in.png" alt="zoom in">
+                    </div>
+                    <div id="zoom-out">
+                        <img src="/resources/ui/zoom-out.png" alt="zoom out">
+                    </div>
                 </div>
-                <div id="picker-container">
-                    <div id="color-picker" style="visibility: hidden;"></div>
+                <div id="draw-btn">
+                    <img id="draw-img-hand" style="display: none;" src="/resources/ui/hand.png" alt="draw mode">
+                    <img id="draw-img-brush" style="display: block;" src="/resources/ui/brush.png" alt="hand mode">
+                </div>
+                <div id="color-picker" style="visibility: hidden;"></div>
+            </div>
+            <div id="batch-container">
+                <div id="progress-container">
+                    <div id="progress-bar"></div>
+                </div>
+                <div id="clear-btn">
+                    <div id="disable-btn"></div>
+                    <img src="/resources/ui/clear.png" alt="clear submission">
+                </div>
+                <div id="submit-btn">
+                    <img src="/resources/ui/submit.png" alt="submit submission">
+                </div>
+                <div id="rotate-btn">
+                    <img src="/resources/ui/rotate.png" alt="rotate UI">
                 </div>
             </div>
         </div>
         <div id="canvas-container">
-            <canvas id="board"></canvas>
             <div id="zoom">
-                <div id="camera">
-                    <canvas id="view"></canvas>
-                </div>
+                <canvas id="board"></canvas>
+                <canvas id="view"></canvas>
             </div>
         </div>
         <div id="loading">

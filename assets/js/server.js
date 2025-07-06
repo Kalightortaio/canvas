@@ -3,23 +3,38 @@ const SHEET_JSON_URL = "https://script.google.com/macros/s/AKfycbwEaB3UL9chsH4Zg
 const board = document.getElementById("board");
 const view = document.getElementById("view");
 const zoomDiv = document.getElementById("zoom");
-const camDiv = document.getElementById("camera");
 const boardCtx = board.getContext("2d", { willReadFrequently: true });
 const viewCtx = view.getContext("2d");
-const brush = document.getElementById('brush-cursor');
-const picker = document.getElementById('color-picker');
+const uiCtnr = document.getElementById('ui-container');
+const drawCtnr = document.getElementById('draw-container');
+const batchCtnr = document.getElementById('batch-container');
 const drawBtn = document.getElementById('draw-btn');
 const drawImgHand = document.getElementById('draw-img-hand');
 const drawImgBrush = document.getElementById('draw-img-brush');
+const pickerCtnr = document.getElementById('picker-container');
+const picker = document.getElementById('color-picker');
+const zoomIn = document.getElementById('zoom-in');
+const zoomOut = document.getElementById('zoom-out');
+const rotateBtn = document.getElementById('rotate-btn');
+const submitBtn = document.getElementById('submit-btn');
+const clearBtn = document.getElementById('clear-btn');
+const progCtnr = document.getElementById('progress-container');
+const progBar = document.getElementById('progress-bar');
+const brush = document.getElementById('brush-cursor');
 const loadingScreen = document.getElementById('loading');
 
 const BOARD_SIZE = 1000;
-const MIN_SCALE = 1, MID_SCALE = 40, MAX_SCALE = 80;
+const MIN_SCALE = 1, MIN_DRAW = 11, MAX_SCALE = 81, ZOOM_STEP = 10;
 const PENDING = new Map();
+const OLD_STATE = new Map();
+const MAX_BATCH = 256;
 
 let mode = "pan";
 let dataRows = [];
-let scale = 1.25, panX = 0, panY = 0;
+let rotated = false;
+let batchProgress = 0;
+let progPercent = 0;
+let scale = 21, panX = 0, panY = 0;
 let dragging = false, startX, startY, startPanX, startPanY;
 board.width = board.height = view.width = view.height = BOARD_SIZE;
 board.addEventListener("contextmenu", e => e.preventDefault());
@@ -52,6 +67,7 @@ async function loadData() {
 
 async function uploadData() {
     if (PENDING.size === 0) return;
+    clearBtn.style.background = 'linear-gradient(to bottom left, transparent var(--lower-bound), #FF0000 var(--lower-bound), #F00000 var(--upper-bound), transparent var(--upper-bound)), linear-gradient(to bottom right, transparent var(--lower-bound), #FF0000 var(--lower-bound), #F00000 var(--upper-bound), transparent var(--upper-bound))';
     const snapshot = flushPending(true);
     try {
         const resp = await fetch(SHEET_JSON_URL, {
@@ -63,7 +79,10 @@ async function uploadData() {
         });
         if ((await resp.text()) === 'OK') {
             snapshot.forEach(({ key, code }) => {
-                if (PENDING.get(key) === code) PENDING.delete(key);
+                if (PENDING.get(key) === code) {
+                    PENDING.delete(key);
+                    OLD_STATE.delete(key);
+                }
             });
             await loadData();
             drawBoardFromRLE(dataRows);
@@ -72,6 +91,8 @@ async function uploadData() {
                 boardCtx.fillStyle = colorMap[code];
                 boardCtx.fillRect(x, y, 1, 1);
             });
+            clearBtn.style.background = '';
+            updateProgress();
         }
     } catch (err) {
         console.error('upload error:', err);
@@ -128,51 +149,20 @@ function flushPending(includeKey = false) {
     return edits;
 }
 
-function applyZoom() {
-    zoomDiv.style.transform = `scale(${scale})`;
-    board.style.width = board.style.height = BOARD_SIZE * scale + "px";
+function applyZoomAndPan() {
+    zoomDiv.style.transform = `translate(${-panX * scale}px, ${-panY * scale}px) scale(${scale})`;
+    zoomDiv.style.transformOrigin = '0 0';
     updateBrushAppearance();
-}
-
-function applyPan() {
-    camDiv.style.transform = `translate(${-panX}px, ${-panY}px)`;
-    board.style.left = -panX * scale + "px";
-    board.style.top = -panY * scale + "px";
 }
 
 view.addEventListener("wheel", e => {
     e.preventDefault();
-
-    const dir = Math.sign(e.deltaY);
-    const next = Math.max(MIN_SCALE,
-        Math.min(MAX_SCALE, scale * (dir > 0 ? 0.9 : 1.1)));
-    if (next === scale) return;
-
-    const cx = window.innerWidth / 2;
-    const cy = window.innerHeight / 2;
-
-    const bx = panX + cx / scale;
-    const by = panY + cy / scale;
-
-    scale = next;
-    panX = bx - cx / scale;
-    panY = by - cy / scale;
-
-    if (mode === 'draw' && scale < MID_SCALE) {
-        mode = 'pan';
-        view.style.cursor = 'grab';
-        picker.style.visibility = 'hidden';
-        drawImgHand.style.display = 'block';
-        drawImgBrush.style.display = 'none';
-        drawBtn.style.backgroundColor = colorMap['A'];
-        updateBrushAppearance();
-    }
-
-    applyZoom();
-    applyPan();
+    // TODO add color swatch change
 }, { passive: false });
 
 function paintPixel(evt) {
+    if (scale < MIN_DRAW) return;
+
     const rect = view.getBoundingClientRect();
     const screenX = evt.clientX - rect.left;
     const screenY = evt.clientY - rect.top;
@@ -180,12 +170,50 @@ function paintPixel(evt) {
     const tileX = Math.floor(screenX / scale);
     const tileY = Math.floor(screenY / scale);
 
-    if (tileX < 0 || tileY < 0 || tileX >= BOARD_SIZE || tileY >= BOARD_SIZE)
+    if (tileX < 0 || tileY < 0 || tileX >= BOARD_SIZE || tileY >= BOARD_SIZE) return;
+
+    const key = `${tileX},${tileY}`;
+    const newCode = currentColorKey;
+    
+    if (!OLD_STATE.has(key)) {
+        const [r, g, b] = boardCtx.getImageData(tileX, tileY, 1, 1).data;
+        const hex = '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase();
+        const orig = Object.entries(colorMap).find(([, c]) => c === hex)?.[0] ?? 'A';
+        OLD_STATE.set(key, orig);
+    }
+
+    const origCode = OLD_STATE.get(key);
+    const wasPending = PENDING.has(key);
+
+    if (newCode === origCode) {
+        if (wasPending) {
+            PENDING.delete(key);
+            boardCtx.fillStyle = colorMap[origCode];
+            boardCtx.fillRect(tileX, tileY, 1, 1);
+            updateProgress();
+        }
         return;
+    }
+
+    const addingNew = !wasPending;
+    if (addingNew && PENDING.size >= MAX_BATCH) return;
 
     boardCtx.fillStyle = colorMap[currentColorKey] || "#000000";
     boardCtx.fillRect(tileX, tileY, 1, 1);
     PENDING.set(`${tileX},${tileY}`, currentColorKey);
+    updateProgress();
+}
+
+function updateProgress() {
+    batchProgress = PENDING.size;
+    progPercent = batchProgress / MAX_BATCH * 100;
+    if (rotated) {
+        progBar.style.height = `${progPercent}%`;
+        progBar.style.width = '100%';
+    } else {
+        progBar.style.width = `${progPercent}%`;
+        progBar.style.height = '';
+    }
 }
 
 function initColorPicker() {
@@ -196,12 +224,6 @@ function initColorPicker() {
         swatch.dataset.colorKey = key;
         swatch.addEventListener('click', () => {
             currentColorKey = swatch.dataset.colorKey;
-            drawBtn.style.backgroundColor = hex;
-            if (['F', 'G', 'J', 'K', 'O', 'P'].includes(currentColorKey)) {
-                drawImgBrush.style.filter = "grayscale(1) invert(1)";
-            } else {
-                drawImgBrush.style.filter = "grayscale(0) invert(0)";
-            }
             updateBrushAppearance();
         });
         picker.appendChild(swatch);
@@ -215,28 +237,33 @@ function updateBrushAppearance() {
         brush.style.width = `${px}px`;
         brush.style.height = `${px}px`;
         brush.style.display = 'block';
+        brush.style.backgroundColor = colorMap[currentColorKey];
+        brush.style.borderColor = '#444';
     } else {
         brush.style.display = 'none';
     }
 }
 
-function centreViewport() {
-    const centreTile = BOARD_SIZE / 2;
-    panX = centreTile - window.innerWidth / 2 / scale;
-    panY = centreTile - window.innerHeight / 2 / scale;
+function randomViewport() {
+    const viewW = window.innerWidth / scale;
+    const viewH = window.innerHeight / scale;
+    const maxPanX = Math.max(0, BOARD_SIZE - viewW);
+    const maxPanY = Math.max(0, BOARD_SIZE - viewH);
+    panX = Math.random() * maxPanX;
+    panY = Math.random() * maxPanY;
 }
 
-function zoomTo(targetScale, pxPerSecond = 60) {
+function zoomTo(targetScale) {
     const startScale = scale;
     if (Math.abs(targetScale - startScale) < 0.001) return;
-    const duration = Math.abs(targetScale - startScale) / pxPerSecond * 1000;
+    const duration = Math.abs(targetScale - startScale) * 100;
     const cx = window.innerWidth / 2;
     const cy = window.innerHeight / 2;
     const anchorX = panX + cx / startScale;
     const anchorY = panY + cy / startScale;
 
     const t0 = performance.now();
-    const ease = t => 1 - Math.pow(1 - t, 3);
+    const ease = t => t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t);
 
     requestAnimationFrame(function step(now) {
         const t = Math.min(1, (now - t0) / duration);
@@ -245,12 +272,26 @@ function zoomTo(targetScale, pxPerSecond = 60) {
         panX = anchorX - cx / scale;
         panY = anchorY - cy / scale;
 
-        applyZoom();
-        applyPan();
+        applyZoomAndPan();
 
-        if (t < 1) requestAnimationFrame(step);
-        else updateBrushAppearance();
+        if (t < 1) {
+            requestAnimationFrame(step);
+        } else {
+            zoomGuard()
+            updateBrushAppearance();
+        }
     });
+}
+
+function zoomGuard() {
+    if (mode === 'draw' && scale < MIN_DRAW) {
+        mode = 'pan';
+        view.style.cursor = 'grab';
+        picker.style.visibility = 'hidden';
+        drawImgHand.style.display = 'none';
+        drawImgBrush.style.display = 'block';
+        updateBrushAppearance();
+    }
 }
 
 function imageSmoothing(ctx) {
@@ -286,19 +327,16 @@ view.addEventListener("pointerdown", e => {
     }
 }, { passive: false });
 
-window.addEventListener("pointermove", e => {
-    if (!dragging) return;
-    if (mode === "pan") {
-        panX = startPanX + (startX - e.clientX) / scale;
-        panY = startPanY + (startY - e.clientY) / scale;
-        applyPan();
-    } else if (mode === "draw") {
+window.addEventListener('pointermove', e => {
+    if (mode === 'draw') {
         const size = Number(brush.dataset.size) || 1;
         brush.style.left = `${e.clientX - size / 2}px`;
         brush.style.top = `${e.clientY - size / 2}px`;
-        if (dragging) {
-            paintPixel(e);
-        }
+        if (dragging) paintPixel(e);
+    } else if (mode === 'pan' && dragging) {
+        panX = startPanX + (startX - e.clientX) / scale;
+        panY = startPanY + (startY - e.clientY) / scale;
+        applyZoomAndPan();
     }
 }, { passive: false });
 
@@ -306,28 +344,91 @@ window.addEventListener("pointerup", e => {
     view.releasePointerCapture(e.pointerId);
     dragging = false;
     if (mode === "pan") view.style.cursor = "grab";
-    if (mode === "draw") uploadData();
 }, { passive: false });
 
 drawBtn.addEventListener('click', () => {
     const enteringDraw = mode === "pan";
     mode = enteringDraw ? "draw" : "pan";
-    if (scale < MID_SCALE) zoomTo(MID_SCALE); 
+    if (scale < MIN_DRAW) zoomTo(MIN_DRAW); 
     view.style.cursor = mode === "pan" ? "grab" : "none";
     picker.style.visibility = mode === "pan" ? "hidden" : "visible";
-    drawImgHand.style.display = mode === "pan" ? "block" : "none";
-    drawImgBrush.style.display = mode === "pan" ? "none" : "block";
-    drawBtn.style.backgroundColor = mode === "pan" ? colorMap['A'] : colorMap[currentColorKey];
+    drawImgHand.style.display = mode === "pan" ? "none" : "block";
+    drawImgBrush.style.display = mode === "pan" ? "block" : "none";
     updateBrushAppearance();
 });
+
+zoomIn.addEventListener('click', () => {
+    if (scale === MAX_SCALE) return;
+    zoomTo(Math.min(scale + ZOOM_STEP, MAX_SCALE));
+});
+
+zoomOut.addEventListener('click', () => {
+    if (scale === MIN_SCALE) return;
+    zoomTo(Math.max(scale - ZOOM_STEP, MIN_SCALE));
+});
+
+rotateBtn.addEventListener('click', () => {
+    rotated = !rotated;
+    if (rotated) {
+        uiCtnr.style.flexDirection = 'column';
+        uiCtnr.style.alignItems = 'flex-end';
+        batchCtnr.style.flexDirection = 'column-reverse';
+        batchCtnr.style.width = 'fit-content';
+        drawCtnr.style.flexDirection = 'row-reverse';
+        batchCtnr.style.padding = '0px 32px 32px 32px';
+        progCtnr.style.minWidth = '64px';
+        progCtnr.style.minHeight = 'max(calc(100dvh - 416px - 32px), 64px)';
+        progBar.style.width = '100%';
+        progBar.style.height = `${progPercent}%`;
+        progBar.style.minHeight = '0';
+        drawCtnr.style.height = 'auto';
+        drawCtnr.style.width = '100%';
+        picker.style.justifyContent = 'flex-end';
+        picker.style.minWidth = '244px';
+        picker.style.height = '64px';
+    } else {
+        uiCtnr.style.flexDirection = '';
+        uiCtnr.style.alignItems = '';
+        batchCtnr.style.flexDirection = '';
+        drawCtnr.style.flexDirection = '';
+        batchCtnr.style.padding = '';
+        batchCtnr.style.width = '';
+        progCtnr.style.minWidth = '';
+        progCtnr.style.minHeight = '';
+        progBar.style.width = `${progPercent}%`;
+        progBar.style.minHeight = '';
+        drawCtnr.style.height = '';
+        drawCtnr.style.width = '';
+        picker.style.minWidth = '';
+        picker.style.height = '';
+    }
+});
+
+clearBtn.addEventListener('click', () => {
+    if (PENDING.size === 0) return;
+    PENDING.forEach((_, key) => {
+        const [x, y] = key.split(',').map(Number);
+        const code = OLD_STATE.get(key) ?? 'A';
+        boardCtx.fillStyle = colorMap[code];
+        boardCtx.fillRect(x, y, 1, 1);
+    });
+    PENDING.clear();
+    OLD_STATE.clear();
+    updateProgress();
+});
+
+submitBtn.addEventListener('click', () => {
+    if (PENDING.size === 0) return;
+    uploadData();
+})
 
 document.addEventListener("DOMContentLoaded", async () => {
     imageSmoothing(boardCtx);
     imageSmoothing(viewCtx);
     await loadData();
     drawBoardFromRLE(dataRows);
-    centreViewport();
-    applyZoom(); applyPan();
+    randomViewport();
+    applyZoomAndPan();
     initColorPicker();
     fade(loadingScreen);
 });

@@ -10,39 +10,57 @@ html, body {
     touch-action: none;
 }
 
+body img {
+    pointer-events: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
 #container {
     position: relative;
     width: 100%;
     height: 100%;
 }
 
-#board {
+#zoom {
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+
+#zoom canvas {
     position: absolute;
     left: 0;
     top: 0;
     image-rendering: pixelated;
+}
+
+#board {
     pointer-events: none;
 }
 
-#zoom,
-#camera {
-    position: absolute;
-    left: 0;
-    top: 0;
-    transform-origin: 0 0;
-}
-
 #view {
-    image-rendering: pixelated;
     cursor: grab;
 }
 
-#right-toolbar {
+#ui-container {
     display: flex;
     height: 100%;
     width: 100%;
-    align-items: flex-end;
-    flex-direction: column;
+    align-items: flex-start;
+    flex-direction: row-reverse;
+}
+
+#batch-container {
+    display: flex;
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-around;
+    padding: 32px 0px 32px 32px;
+    gap: 32px;
 }
 
 #draw-container {
@@ -50,55 +68,113 @@ html, body {
     height: 100%;
     flex-direction: column;
     align-items: center;
-    justify-content: space-around;
     padding: 32px;
     gap: 32px;
 }
 
-#picker-container {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-}
-
-#draw-btn {
+#draw-btn,
+#zoom-btn,
+#rotate-btn,
+#submit-btn,
+#clear-btn,
+#progress-container {
     position: relative;
-    width: 64px;
-    height: 64px;
+    min-width: 64px;
+    max-width: 64px;
+    min-height: 64px;
+    max-height: 64px;
     z-index: 2;
     background-color: white;
     outline: 4px solid black;
     border-radius: 8px;
-    padding: 8px;
 }
 
-#draw-img-hand,
-#draw-img-brush {
+#clear-btn {
+    --lower-bound: calc(50% - 2px);
+    --upper-bound: calc(50% + 2px);
+}
+
+#progress-container {
+    min-width: max(calc(100dvw - 416px - 32px), 64px);
+    overflow: hidden;
+}
+
+#progress-bar {
+    width: 0%;
+    min-height: inherit;
+    background: #FF0000;
+    background-image: -webkit-linear-gradient(135deg, rgba(255, 255, 255, 0.5) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.5) 50%, rgba(255, 255, 255, 0.5) 75%, transparent 75%, transparent);
+    background-image: linear-gradient(-45deg, rgba(255, 255, 255, 0.5) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.5) 50%, rgba(255, 255, 255, 0.5) 75%, transparent 75%, transparent);
+    background-size: 35px 35px;
+    -webkit-animation: progressAnim 3s linear infinite, progressBG 20s infinite linear;
+    animation: progressAnim 3s linear infinite, progressBG 20s infinite linear;
+}
+
+#submit-btn,
+#clear-btn,
+#rotate-btn,
+#draw-btn {
+    padding: 8px;
+    cursor: pointer;
+}
+
+#zoom-btn {
+    --lower-bound: calc(50% - 2px);
+    --upper-bound: calc(50% + 2px);
+    background-image: linear-gradient(to bottom left, transparent var(--lower-bound), #000 var(--lower-bound), #000 var(--upper-bound), transparent var(--upper-bound));
+}
+
+#ui-container img {
     width: 48px;
     height: 48px;
 }
 
+#zoom-btn img {
+    width: 100%;
+    height: 100%;
+}
+
+#zoom-in,
+#zoom-out {
+    position: absolute;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    padding: 4px;
+}
+
+#zoom-in {
+    top: 0px;
+    right: 0px;
+}
+
+#zoom-out {
+    bottom: 0px;
+    left: 0px;
+}
+
 #color-picker {
     position: relative;
-    display: grid;
-    width: 48px;
-    min-height: fit-content;
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: column;
+    width: fit-content;
+    height: 244px;
     z-index: 2;
-    gap: 8px;
-    padding: 8px;
+    gap: 4px;
+    padding: 4px;
     background-color: white;
     outline: 4px solid black;
     border-radius: 8px;
 }
 
 .color-swatch {
-    width: 32px;
-    height: auto;
-    aspect-ratio: 1/1;
+    min-width: 26px;
+    max-width: 26px;
+    min-height: 26px;
+    max-height: 26px;
     border: 2px solid #444;
-    border-radius: 2px;
+    border-radius: 4px;
     box-sizing: border-box;
     cursor: pointer;
 }
@@ -106,7 +182,8 @@ html, body {
 #brush-cursor {
     position: fixed;
     pointer-events: none;
-    border: 1px solid #000;
+    border: 2px solid #444;
+    background-color: #fff;
     box-sizing: border-box;
     z-index: 1;
     display: none;
@@ -131,10 +208,38 @@ html, body {
     max-height: 400px;
 }
 
-@media(max-height: 810px) {
-    #draw-container { flex-direction: row-reverse; height: auto; width: 100% }
-    #color-picker { width: fit-content; display: flex }
+@keyframes progressBG {
+    12.5% { background-color: #FFA500; }
+    25%   { background-color: #FFFF00; }
+    37.5% { background-color: #7FFF00; }
+    50%   { background-color: #00FFFF; }
+    62.5% { background-color: #0000FF; }
+    75%   { background-color: #9932CC; }
+    87.5% { background-color: #FF1493; }
+    100%  { background-color: #FF0000; }
 }
 
-@media(pointer: none), (pointer: coarse), (max-width: 810px) and (max-height: 810px) {
+@-webkit-keyframes progressAnim {
+    0%   { background-position: 0 0; }
+    100% { background-position: 35px 35px; }
+}
+
+@keyframes progressAnim {
+    0%   { background-position: 0 0; }
+    100% { background-position: 35px 35px; }
+}
+
+@media(max-height: 500px) {
+}
+
+@media(max-width: 512px) {
+    #batch-container {
+        height: 100%;
+        flex-direction: column-reverse;
+        width: auto;
+    }
+    #progress-container {
+        min-width: 64px;
+        min-height: max(calc(100dvh - 320px - 32px), 148px);
+    }
 }
