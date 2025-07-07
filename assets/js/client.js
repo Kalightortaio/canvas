@@ -1,4 +1,4 @@
-const SHEET_JSON_URL = "https://script.google.com/macros/s/AKfycbwEaB3UL9chsH4ZgyTBbNxYsZniRZ4M111-wMMql4pzTdxCkIG-DD06HSY6QsaHpRKTZQ/exec";
+const SHEET_JSON_URL = "https://script.google.com/macros/s/AKfycbxrZ32F7kiDaqj69uZonFb1_mprrzolDYdX9qALG4FZHmHJ3Tjs1671If9-Geb3k2GSCQ/exec";
 
 const board = document.getElementById("board");
 const view = document.getElementById("view");
