@@ -20,16 +20,22 @@ const submitBtn = document.getElementById('submit-btn');
 const clearBtn = document.getElementById('clear-btn');
 const progCtnr = document.getElementById('progress-container');
 const progBar = document.getElementById('progress-bar');
-const brush = document.getElementById('brush-cursor');
 const loadingScreen = document.getElementById('loading');
+const infoBtn = document.getElementById('info-btn');
+const infoModal = document.getElementById('info-modal');
+const disclmrBtn = document.getElementById('disclaimer-btn');
+const brush = document.getElementById('brush-cursor');
+const clickSound = new Audio('/resources/sounds/click.mp3');
 
 const BOARD_SIZE = 1000;
 const MIN_SCALE = 1, MIN_DRAW = 21, MAX_SCALE = 81, ZOOM_STEP = 10;
 const PENDING = new Map();
 const OLD_STATE = new Map();
 const MAX_BATCH = 256;
+const PITCHES = [0.7, 0.8, 0.9, 1.0];
 
 let mode = "pan";
+let mute = false;
 let dataRows = [];
 let batchProgress = 0;
 let progPercent = 0;
@@ -66,11 +72,11 @@ const hexToCode = Object.fromEntries(
 async function loadData() {
     const resp = await fetch(SHEET_JSON_URL + "?secret_tunnel");
     dataRows = await resp.json();
-}
+};
 
 async function uploadData() {
     if (PENDING.size === 0) return;
-    clearBtn.style.background = 'linear-gradient(to bottom left, transparent var(--lower-bound), #FF0000 var(--lower-bound), #F00000 var(--upper-bound), transparent var(--upper-bound)), linear-gradient(to bottom right, transparent var(--lower-bound), #FF0000 var(--lower-bound), #F00000 var(--upper-bound), transparent var(--upper-bound))';
+    clearBtn.style.backgroundImage = 'linear-gradient(to bottom left, transparent var(--lower-bound), #FF0000 var(--lower-bound), #F00000 var(--upper-bound), transparent var(--upper-bound)), linear-gradient(to bottom right, transparent var(--lower-bound), #FF0000 var(--lower-bound), #F00000 var(--upper-bound), transparent var(--upper-bound))';
     const snapshot = flushPending(true);
     try {
         const resp = await fetch(SHEET_JSON_URL, {
@@ -94,13 +100,13 @@ async function uploadData() {
                 boardCtx.fillStyle = colorMap[code];
                 boardCtx.fillRect(x, y, 1, 1);
             });
-            clearBtn.style.background = '';
+            clearBtn.style.backgroundImage = '';
             updateProgress();
         }
     } catch (err) {
         console.error('upload error:', err);
     }
-}
+};
 
 function drawBoardFromRLE(rleRows) {
     for (let cellY = 0; cellY < rleRows.length; cellY++) {
@@ -109,7 +115,7 @@ function drawBoardFromRLE(rleRows) {
             drawCell(boardCtx, cellData, cellX, cellY);
         }
     }
-}
+};
 
 function decompressLine(rle) {
     const out = [];
@@ -120,7 +126,7 @@ function decompressLine(rle) {
         out.push(m[2].repeat(n));
     }
     return out.join('');
-  }
+};
 
 function decompressCell(cellStr) {
     const rows = [];
@@ -131,7 +137,7 @@ function decompressCell(cellStr) {
         for (let i = 0; i < rep; i++) rows.push([...line]);
     });
     return rows;
-  }
+};
 
 function drawCell(context, cellData, cellX, cellY) {
     for (let y = 0; y < cellData.length; y++) {
@@ -142,7 +148,7 @@ function drawCell(context, cellData, cellX, cellY) {
             context.fillRect((cellX * 100 + x), (cellY * 100 + y), 1, 1);
         }
     }
-}
+};
 
 function flushPending(includeKey = false) {
     const edits = Array.from(PENDING, ([key, code]) => {
@@ -150,17 +156,35 @@ function flushPending(includeKey = false) {
         return includeKey ? { x, y, code, key } : { x, y, code };
     });
     return edits;
-}
+};
 
 function applyZoomAndPan() {
     zoomDiv.style.transform = `translate(${-panX * scale}px, ${-panY * scale}px) scale(${scale})`;
     zoomDiv.style.transformOrigin = '0 0';
     updateBrushAppearance();
-}
+};
 
 view.addEventListener("wheel", e => {
     e.preventDefault();
-    // TODO add color swatch change
+    if (mode !== 'draw') return;
+
+    const keys = Object.keys(colorMap);
+    const currentIndex = keys.indexOf(currentColorKey);
+    if (currentIndex === -1) return;
+
+    const delta = Math.sign(e.deltaY);
+    let nextIndex = currentIndex + delta;
+
+    if (nextIndex < 0) nextIndex = keys.length - 1;
+    if (nextIndex >= keys.length) nextIndex = 0;
+
+    currentColorKey = keys[nextIndex];
+
+    document.querySelectorAll('.sw-selected').forEach(element => element.classList.remove('sw-selected'));
+    const newSwatch = document.querySelector(`.color-swatch[data-color-key="${currentColorKey}"]`);
+    if (newSwatch) newSwatch.classList.add('sw-selected');
+
+    updateBrushAppearance();
 }, { passive: false });
 
 function paintPixel(evt) {
@@ -205,27 +229,33 @@ function paintPixel(evt) {
     boardCtx.fillRect(tileX, tileY, 1, 1);
     PENDING.set(`${tileX},${tileY}`, currentColorKey);
     updateProgress();
-}
+};
 
 function updateProgress() {
     batchProgress = PENDING.size;
     progPercent = batchProgress / MAX_BATCH * 100;
     document.documentElement.style.setProperty('--prog-percent', `${progPercent}%`);
-}
+};
 
 function initColorPicker() {
     Object.entries(colorMap).forEach(([key, hex]) => {
         const swatch = document.createElement('div');
         swatch.className = 'color-swatch';
+        swatch.classList.add('clickable');
         swatch.style.backgroundColor = hex;
         swatch.dataset.colorKey = key;
+        if (key === currentColorKey) swatch.classList.add('sw-selected');
         swatch.addEventListener('click', () => {
             currentColorKey = swatch.dataset.colorKey;
+            document.querySelectorAll('.sw-selected').forEach((element) => {
+                element.classList.remove('sw-selected');
+            });
+            swatch.classList.add('sw-selected');
             updateBrushAppearance();
         });
         picker.appendChild(swatch);
     });
-}
+};
 
 function updateBrushAppearance() {
     if (mode === "draw") {
@@ -239,7 +269,7 @@ function updateBrushAppearance() {
     } else {
         brush.style.display = 'none';
     }
-}
+};
 
 function randomViewport() {
     const viewW = window.innerWidth / scale;
@@ -248,7 +278,7 @@ function randomViewport() {
     const maxPanY = Math.max(0, BOARD_SIZE - viewH);
     panX = Math.random() * maxPanX;
     panY = Math.random() * maxPanY;
-}
+};
 
 function zoomTo(targetScale) {
     const startScale = scale;
@@ -278,29 +308,29 @@ function zoomTo(targetScale) {
             updateBrushAppearance();
         }
     });
-}
+};
 
 function zoomGuard() {
     if (mode === 'draw' && scale < MIN_DRAW) {
         exitDrawMode();
     }
-}
+};
 
 function exitDrawMode() {
     mode = 'pan';
     view.style.cursor = 'grab';
-    picker.style.visibility = 'hidden';
+    picker.style.display = 'none';
     drawImgHand.style.display = 'none';
     drawImgBrush.style.display = 'block';
     updateBrushAppearance();
-}
+};
 
 function imageSmoothing(ctx) {
     ctx.mozImageSmoothingEnabled = false;
     ctx.webkitImageSmoothingEnabled = false;
     ctx.msImageSmoothingEnabled = false;
     ctx.imageSmoothingEnabled = false;
-}
+};
 
 function fade(element) {
     var op = 1;
@@ -313,7 +343,25 @@ function fade(element) {
         element.style.filter = 'alpha(opacity=' + op * 100 + ")";
         op -= op * 0.05;
     }, 50);
-}
+};
+
+function assignClickable() {
+    document.querySelectorAll('.clickable').forEach(element => {
+        element.addEventListener('click', () => {
+            if (!mute) {
+                clickSound.playbackRate = PITCHES[Math.floor(Math.random() * PITCHES.length)];
+                clickSound.currentTime = 0;
+                clickSound.volume = 0.25;
+                clickSound.play();
+            }
+            element.classList.add('play-animation');
+
+            element.addEventListener('animationend', () => {
+                element.classList.remove('play-animation');
+            }, { once: true });
+        });
+    });
+};
 
 view.addEventListener("pointerdown", e => {
     e.preventDefault();
@@ -352,7 +400,7 @@ drawBtn.addEventListener('click', () => {
     mode = enteringDraw ? "draw" : "pan";
     if (scale < MIN_DRAW) zoomTo(MIN_DRAW); 
     view.style.cursor = mode === "pan" ? "grab" : "none";
-    picker.style.visibility = mode === "pan" ? "hidden" : "visible";
+    picker.style.display = mode === "pan" ? "none" : "flex";
     drawImgHand.style.display = mode === "pan" ? "none" : "block";
     drawImgBrush.style.display = mode === "pan" ? "block" : "none";
     updateBrushAppearance();
@@ -393,14 +441,62 @@ clearBtn.addEventListener('click', () => {
 submitBtn.addEventListener('click', () => {
     if (PENDING.size === 0) return;
     uploadData();
-})
+});
+
+infoBtn.addEventListener('click', () => {
+    infoModal.classList.toggle('show');
+    uiCtnr.classList.toggle('show');
+});
+
+disclmrBtn.addEventListener('click', () => {
+    infoBtn.click();
+});
 
 window.addEventListener("resize", () => {
     requestAnimationFrame(() => {
-        const tooSmall = Math.min(window.innerWidth, window.innerHeight) < 250;
+        const tooSmall = Math.min(window.innerWidth, window.innerHeight) < 300;
         if (mode === 'draw' && tooSmall) exitDrawMode();
     });
 }, { passive: true });
+
+document.addEventListener('keydown', (event) => {
+    const key = event.key;
+
+    switch (key) {
+        case 't':
+        case 'T':
+            drawBtn.click();
+            break;
+        case 'r':
+        case 'R':
+            rotateBtn.click();
+            break;
+        case 'Backspace':
+        case 'Delete':
+            clearBtn.click();
+            break;
+        case 'Enter':
+            submitBtn.click();
+            break;
+        case '+':
+        case '=':
+            zoomIn.click();
+            break;
+        case '-':
+        case '_':
+            zoomOut.click();
+            break;
+        case 'i':
+        case 'I':
+        case 'Escape':
+            infoBtn.click();
+            break;
+        case 'm':
+        case 'M':
+            mute = !mute;
+            break;
+    }
+});
 
 document.addEventListener("DOMContentLoaded", async () => {
     imageSmoothing(boardCtx);
@@ -411,4 +507,5 @@ document.addEventListener("DOMContentLoaded", async () => {
     applyZoomAndPan();
     initColorPicker();
     fade(loadingScreen);
+    assignClickable();
 });

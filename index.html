@@ -6,37 +6,42 @@
         <title>Kali's Canvas</title>
         <meta name="description" content="An r/place inspired canvas using an unorthodox backend approach">
         <link rel="icon" href="/resources/ui/favicon.png">
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap">
         <link rel="stylesheet" type="text/css" href="assets/css/index.css">
     </head>
     <body>
-        <div id="ui-container">
+        <div id="ui-container" class="show">
             <div id="draw-container">
-                <div id="zoom-btn">
-                    <div id="zoom-in">
+                <div id="zoom-btn" class="clickable">
+                    <div id="zoom-in" class="clickable">
                         <img src="/resources/ui/zoom-in.png" alt="zoom in">
                     </div>
-                    <div id="zoom-out">
+                    <div id="zoom-out" class="clickable">
                         <img src="/resources/ui/zoom-out.png" alt="zoom out">
                     </div>
                 </div>
-                <div id="draw-btn">
+                <div id="draw-btn" class="clickable">
                     <img id="draw-img-hand" style="display: none;" src="/resources/ui/hand.png" alt="draw mode">
                     <img id="draw-img-brush" style="display: block;" src="/resources/ui/brush.png" alt="hand mode">
                 </div>
-                <div id="color-picker" style="visibility: hidden;"></div>
+                <div id="color-picker"></div>
+                <div id="info-btn" class="clickable">
+                    <img src="/resources/ui/info.png" alt="info modal">
+                </div>
             </div>
             <div id="batch-container">
                 <div id="progress-container">
                     <div id="progress-bar"></div>
                 </div>
-                <div id="clear-btn">
-                    <div id="disable-btn"></div>
+                <div id="clear-btn" class="clickable">
                     <img src="/resources/ui/clear.png" alt="clear submission">
                 </div>
-                <div id="submit-btn">
+                <div id="submit-btn" class="clickable">
                     <img src="/resources/ui/submit.png" alt="submit submission">
                 </div>
-                <div id="rotate-btn">
+                <div id="rotate-btn" class="clickable">
                     <img src="/resources/ui/rotate.png" alt="rotate UI">
                 </div>
             </div>
@@ -49,6 +54,31 @@
         </div>
         <div id="loading">
             <img src="resources/ui/loading.gif">
+        </div>
+        <div id="info-modal" class="show">
+            <div id="info-text">
+                <h3>Kali's Canvas v1.0 &mdash; About</h3>
+                <p>This is an r/place inspired pixel canvas using an unorthodox backend approach with a custom run length encoding. Anyone can draw, and drawings are persisted for all users. Please be respectful and ethical.</p>
+                <h3>Disclaimer</h3>
+                <p>This site is a proof of concept and is not actively maintained. All content is user generated and may include inappropriate or offensive drawings. Content may be removed without notice if abused. Use at your own discretion.</p>
+                <h3>Keyboard Shortcuts</h3>
+                <p><code>Scroll</code> to change color when painting</p>
+                <p><code>Bksp/Del</code> to discard your art</p>
+                <p><code>Enter</code> to submit your art</p>
+                <p><code>T</code> to switch modes</p>
+                <p><code>+/-</code> to zoom</p>
+                <p><code>R</code> to rotate the UI</p>
+                <p><code>Esc/I</code> to toggle this window</p>
+                <p><code>M</code> to toggle mute the website sounds :&#40;</p>
+                <h3>GitHub Repo</h3>
+                <p>View the source code, contribute, or report material: <a href="https://github.com/Kalightortaio/canvas" target="_blank">Kali's Canvas</a>.</p>
+                <h3>To-do</h3>
+                <p>&mdash; SEO Optimization</p>
+                <p>&mdash; Publish documentation & "serverside" code.</p>
+            </div>
+            <div id="disclaimer-container">
+                <div id="disclaimer-btn" class="clickable"><h3>I understand</h3></div>
+            </div>
         </div>
         <div id="brush-cursor"></div>
         <script src="https://code.jquery.com/jquery-3.6.0.js" integrity="sha256-H+K7U5CnXl1h5ywQfKtSj8PCmoN9aaq30gDh27Xc0jk="crossorigin="anonymous"></script>
