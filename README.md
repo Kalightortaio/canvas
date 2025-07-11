@@ -18,3 +18,4 @@ M to toggle mute the website sounds
 ## To-Do:
 - SEO Optimization
 - Publish documentation & "serverside" code.
+- Fix the bug where you can drag the canvas past the viewport, soft locking the page.
