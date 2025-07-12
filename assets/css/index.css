@@ -5,15 +5,17 @@ code {
 }
 
 :root {
-    --scale: 1.25;
-    --base2: calc(2px * var(--scale));
-    --base4: calc(4px * var(--scale));
-    --base8: calc(8px * var(--scale));
-    --base16: calc(16px * var(--scale));
-    --base32: calc(32px * var(--scale));
-    --base64: calc(64px * var(--scale));
-    --base128: calc(128px * var(--scale));
-    --text-scaling: calc(0.64 * var(--scale) * var(--scale) * var(--scale) - 0.96 * var(--scale) * var(--scale) + 0.92 * var(--scale) + 0.4);
+    --vp: min(100dvw, 100dvh);
+    --scale-a: calc(0.5px + (var(--vp) - 300px) / 600);
+    --scale-b: calc(1.0px + (var(--vp) - 600px) / 1600);
+    --scale: clamp(0.5px, min(var(--scale-a), var(--scale-b)), 1.25px);
+    --base2: calc(2 * var(--scale));
+    --base4: calc(4 * var(--scale));
+    --base8: calc(8 * var(--scale));
+    --base16: calc(16 * var(--scale));
+    --base32: calc(32 * var(--scale));
+    --base64: calc(64 * var(--scale));
+    --base128: calc(128 * var(--scale));
     --swatch-size: calc((var(--base64) - (3 * var(--base4))) / 2);
     --color-picker: calc((8 * var(--swatch-size)) + (9 * var(--base4)));
     --modal-offset: calc(var(--base128) + var(--base32));
@@ -21,12 +23,12 @@ code {
 }
 
 body h3 {
-    font-size: calc(var(--text-scaling) * 2.0rem);
+    font-size: var(--base32);
     margin: var(--base4) 0 var(--base4) 0;
 }
 
 body p {
-    font-size: calc(var(--text-scaling) * 1.5rem);
+    font-size: calc(var(--base16) + var(--base8));
     margin: var(--base4) 0 var(--base4) 0;
 }
 
@@ -373,24 +375,6 @@ body a:visited {
 @keyframes progressAnim {
     0%   { background-position: 0 0; }
     100% { background-position: 35px 35px; }
-}
-
-@media(max-width: 1000px), (max-height: 1000px) {
-    :root {
-        --scale: 1.00;
-    }
-}
-
-@media(max-width: 600px), (max-height: 600px) {
-    :root {
-        --scale: 0.75;
-    }
-}
-
-@media(max-width: 450px), (max-height: 450px) {
-    :root {
-        --scale: 0.50;
-    }
 }
 
 @media(max-width: 300px), (max-height: 300px) {

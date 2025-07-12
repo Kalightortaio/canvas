@@ -1,4 +1,4 @@
-# Kali's Canvas v1.0
+# Kali's Canvas v1.0.1
 ## About
 This is an r/place inspired pixel canvas using an unorthodox backend approach with a custom run length encoding. Anyone can draw, and drawings are persisted for all users. Please be respectful and ethical.
 
